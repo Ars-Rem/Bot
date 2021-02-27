@@ -1,7 +1,8 @@
 import logging
-import sys
+
 import asyncio
 from datetime import datetime
+from sys import platform
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardRemove, \
     ReplyKeyboardMarkup, KeyboardButton, \
@@ -13,7 +14,8 @@ from sqliter import PHONE
 from sqliter import ALL
 from face import Facebook
 
-print(sys.platform)
+print(platform)
+#print(config.win_vs_unix(platform))
 
 API_TOKEN = config.TOKEN
 
@@ -68,7 +70,8 @@ async def send_welcome(message: types.Message):
     st = KeyboardButton('start')
     markup.add(st)
     if not db_user.subscriber_exist(message.from_user.id):
-        db_user.add_subscriber(message.from_user.id, message.from_user.full_name, datetime.now(), True)
+        db_user.add_subscriber(message.from_user.id, message.from_user.first_name, message.from_user.last_name,
+                               datetime.now(), True)
     else:
         db_user.update_subscription(message.from_user.id, True)
     # await message.answer('Ви підписалися на розсилку')
@@ -83,6 +86,7 @@ async def send_welcome(message: types.Message):
 
 @dp.message_handler(content_types=['text'])
 async def process_photo_command(message: types.Message, request='yes'):
+    global admins
     if message.chat.type == 'private':
         if message.text == 'Новояворівськ':
 
@@ -98,24 +102,30 @@ async def process_photo_command(message: types.Message, request='yes'):
             item3 = KeyboardButton("Акції 😊")
             item4 = KeyboardButton("База")
             item5 = KeyboardButton("Вибрати місто")
-            item6 = KeyboardButton(text='Замовити дзвінок', request_contact=True)
-            item7 = KeyboardButton('Замовити заміри', request_contact=False)
+            # item6 = KeyboardButton(text='Замовити дзвінок', request_contact=True)
+            # item7 = KeyboardButton('Замовити заміри', request_contact=False)
             # item5 = types.KeyboardButton("Залишити геолокацію", request_location=True)
+            item8 = KeyboardButton('Замовити дзвінок або заміри')  # TODO: Rename
             markup.add(item1, item2, item3)
-            markup.add(item6, item7)
+            # markup.add(item7)
+            markup.add(item8)
             markup.row(item5)
 
             if message.chat.id in config.admin_all:
                 markup.row(item4)
 
-            # TODO: возможно приветствие вывести в сплывающее окно?
+            # TODO: возможно приветствие вывести в всплывающее окно?
             await message.answer(config.hello_text(message.from_user.first_name), parse_mode=types.ParseMode.MARKDOWN,
                                  reply_markup=markup)
 
         elif message.text == 'Контакти':
-            photo = open(config.foto, 'rb')
-            await bot.send_photo(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
-
+            photo = config.map
+            #photo = open(config.foto_map, 'rb')
+            await bot.send_message(message.chat.id,
+                                   'Адреса: {}\nНомер телефону: {}'.format(config.address, config.phone_number))
+            #await bot.send_photo(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
+            #await bot.send_document(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
+            await bot.send_venue(message.chat.id, latitude=50.3942184, longitude=24.2279925, title='Золотий дуб', address=config.address, foursquare_id=config.code_plus, google_place_id=config.code_plus)
         elif message.text == "Акції 😊":
             markup = InlineKeyboardMarkup(row_width=1, resize_keyboard=True)
             item1 = InlineKeyboardButton("Двері вхідні", callback_data='action1')
@@ -140,6 +150,38 @@ async def process_photo_command(message: types.Message, request='yes'):
             await message.answer(f'Добрий день, {message.from_user.first_name}, де Ви знаходитесь?',
                                  parse_mode=types.ParseMode.MARKDOWN, reply_markup=markup)
 
+
+        elif message.text == "Замовити дзвінок або заміри":
+            markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+            item6 = KeyboardButton(text='Замовити дзвінок', request_contact=True)
+            item7 = KeyboardButton('Замовити заміри')
+            item9 = KeyboardButton('Повернутись')
+            markup.add(item6)
+            markup.add(item7)
+            markup.add(item9)
+            await bot.send_message(message.chat.id, "Що бажаєте замовити?",
+                                   parse_mode=types.ParseMode.MARKDOWN, reply_markup=markup)
+
+        elif message.text == "Повернутись":
+            # keyboard
+            markup = ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=False)
+            item1 = KeyboardButton("Контакти", request_contact=False)
+            item2 = KeyboardButton("Більше тут")
+            item3 = KeyboardButton("Акції 😊")
+            item4 = KeyboardButton("База")
+            item5 = KeyboardButton("Вибрати місто")
+            item8 = KeyboardButton('Замовити дзвінок або заміри')  # TODO: Rename
+            markup.add(item1, item2, item3)
+            markup.add(item8)
+            markup.row(item5)
+
+            if message.chat.id in config.admin_all:
+                markup.row(item4)
+
+            # TODO: возможно приветствие вывести в сплывающее окно?
+            await message.answer(config.hello_text(message.from_user.first_name), parse_mode=types.ParseMode.MARKDOWN,
+                                 reply_markup=markup)
+
         elif message.text == "Замовити заміри":
             markup = InlineKeyboardMarkup(row_width=1, resize_keyboard=True)
             item1 = InlineKeyboardButton("Двері вхідні", callback_data='act1')
@@ -149,30 +191,37 @@ async def process_photo_command(message: types.Message, request='yes'):
             markup.add(item1, item2, item3, item4)
             await bot.send_message(message.chat.id, 'Що бажаєте замовити?', reply_markup=markup)
 
-
         elif message.text == 'База':
             try:
                 for admins in config.admin_all:
-                    await bot.send_message(admins, db.send_recording())
+                    await bot.send_message(admins, db.return_all())
+                    #await bot.send_message(admins, db.send_recording())
             except TypeError:
                 print("Пустое значение")
             print(db.send_callback_all())  # TODO remove
+
         else:
             await bot.send_message(message.from_user.id, 'Викорустовуйте, будь-ласка, меню')
             db.add_text(message.from_user.id, message.text)
+
+            for admins in config.admin_all:
+                await bot.send_message(admins, message.from_user.first_name)
+                await bot.send_message(admins, message.text)
+
 
 
 # save phone number in db.db'sub'
 @dp.message_handler(content_types=["contact"])
 async def tel_number(message):
-    db_phone.add_phone_number(message.contact['phone_number'], message.contact['first_name'],
-                              message.contact['last_name'], message.contact['user_id'])
-    db_all.merged()
+    db_phone.add_phone_number(message.contact['user_id'], message.contact['phone_number'])
+    # db_all.merged1()
+
     try:
         answer = "Ім'я: {} {},\nНомер телефону: {}" \
             .format(message.contact['first_name'], message.contact['last_name'], message.contact['phone_number'])
 
         for admins in config.admin_all:
+            await bot.send_message(admins, "Замовлено дзвінок!")
             await bot.send_message(admins, answer)
 
     except TypeError:
@@ -205,41 +254,42 @@ async def callback_inline(call):
 
             # ACT1-4
             if call.data == 'act1':
-                db.add_callback(call.message.chat.id, call.message.chat.full_name, config.items_list[0], datetime.now())
+                db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
+                                config.items_list[0], datetime.now())
 
                 # message for admins
                 for admins in config.admin_all:
-                    await bot.send_message(admins, 'Нове замовлення!')
+                    await bot.send_message(admins, 'Замовлено заміри!')
                 for admins in config.admin_all:
                     await bot.send_message(admins, db.send_recording())
                 # message for all
                 await bot.send_message(call.message.chat.id, 'Очікуйте дзвінок')
 
-
             elif call.data == 'act2':
-                db.add_callback(call.message.chat.id, call.message.chat.full_name, config.items_list[1],
-                                datetime.now())
+                db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
+                                config.items_list[1], datetime.now())
                 for admins in config.admin_all:
-                    await bot.send_message(admins, 'Нове замовлення!')
+                    await bot.send_message(admins, 'Замовлено заміри!')
 
                 for admins in config.admin_all:
                     await bot.send_message(admins, db.send_recording())
                 await bot.send_message(call.message.chat.id, 'Очікуйте дзвінок')
 
             elif call.data == 'act3':
-                db.add_callback(call.message.chat.id, call.message.chat.full_name, config.items_list[2], datetime.now())
+                db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
+                                config.items_list[2], datetime.now())
                 for admins in config.admin_all:
-                    await bot.send_message(admins, 'Нове замовлення!')
+                    await bot.send_message(admins, 'Замовлено заміри!')
 
                 for admins in config.admin_all:
                     await bot.send_message(admins, db.send_recording())
                 await bot.send_message(call.message.chat.id, 'Очікуйте дзвінок')
 
-
             elif call.data == 'act4':
-                db.add_callback(call.message.chat.id, call.message.chat.full_name, config.items_list[3], datetime.now())
+                db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
+                                config.items_list[3], datetime.now())
                 for admins in config.admin_all:
-                    await bot.send_message(admins, 'Нове замовлення!')
+                    await bot.send_message(admins, 'Замовлено заміри!')
 
                 for admins in config.admin_all:
                     await bot.send_message(admins, db.send_recording())
