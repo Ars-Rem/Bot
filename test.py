@@ -1,7 +1,8 @@
 import logging
-
 import asyncio
 from datetime import datetime
+from time import strftime as time
+
 from sys import platform
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import ReplyKeyboardRemove, \
@@ -15,7 +16,7 @@ from sqliter import ALL
 from face import Facebook
 
 print(platform)
-#print(config.win_vs_unix(platform))
+# print(config.win_vs_unix(platform))
 
 API_TOKEN = config.TOKEN
 
@@ -71,7 +72,7 @@ async def send_welcome(message: types.Message):
     markup.add(st)
     if not db_user.subscriber_exist(message.from_user.id):
         db_user.add_subscriber(message.from_user.id, message.from_user.first_name, message.from_user.last_name,
-                               datetime.now(), True)
+                               time('%d-%m-%Y %X'), True)
     else:
         db_user.update_subscription(message.from_user.id, True)
     # await message.answer('Ви підписалися на розсилку')
@@ -119,13 +120,15 @@ async def process_photo_command(message: types.Message, request='yes'):
                                  reply_markup=markup)
 
         elif message.text == 'Контакти':
-            photo = config.map
-            #photo = open(config.foto_map, 'rb')
+
+            photo = open(config.foto_map, 'rb')
             await bot.send_message(message.chat.id,
                                    'Адреса: {}\nНомер телефону: {}'.format(config.address, config.phone_number))
-            #await bot.send_photo(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
-            #await bot.send_document(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
-            await bot.send_venue(message.chat.id, latitude=50.3942184, longitude=24.2279925, title='Золотий дуб', address=config.address, foursquare_id=config.code_plus, google_place_id=config.code_plus)
+            await bot.send_photo(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
+            # await bot.send_document(message.chat.id, photo, parse_mode=types.ParseMode.MARKDOWN)
+            #await bot.send_venue(message.chat.id, latitude=50.3942184, longitude=24.2279925, title='Золотий дуб',
+            #                     address=config.address, foursquare_id=config.code_plus,
+            #                     google_place_id=config.code_plus)
         elif message.text == "Акції 😊":
             markup = InlineKeyboardMarkup(row_width=1, resize_keyboard=True)
             item1 = InlineKeyboardButton("Двері вхідні", callback_data='action1')
@@ -195,27 +198,30 @@ async def process_photo_command(message: types.Message, request='yes'):
             try:
                 for admins in config.admin_all:
                     await bot.send_message(admins, db.return_all())
-                    #await bot.send_message(admins, db.send_recording())
+                    # await bot.send_message(admins, db.send_recording())
             except TypeError:
                 print("Пустое значение")
             print(db.send_callback_all())  # TODO remove
 
         else:
-            await bot.send_message(message.from_user.id, 'Викорустовуйте, будь-ласка, меню')
+            if message.from_user.id not in config.admin_all:
+                await bot.send_message(message.from_user.id, 'Використовуйте, будь-ласка, меню')
             db.add_text(message.from_user.id, message.text)
 
             for admins in config.admin_all:
-                await bot.send_message(admins, message.from_user.first_name)
-                await bot.send_message(admins, message.text)
+                name = message.from_user.first_name
+                text = message.text
 
+                await bot.send_message(admins, '{} говорить:\n\n{}'.format(name, text))
+                '''photo = open(message.photo, 'r')
+                print(type(photo))
+                await bot.send_photo(admins, photo)'''
 
 
 # save phone number in db.db'sub'
 @dp.message_handler(content_types=["contact"])
 async def tel_number(message):
     db_phone.add_phone_number(message.contact['user_id'], message.contact['phone_number'])
-    # db_all.merged1()
-
     try:
         answer = "Ім'я: {} {},\nНомер телефону: {}" \
             .format(message.contact['first_name'], message.contact['last_name'], message.contact['phone_number'])
@@ -255,7 +261,7 @@ async def callback_inline(call):
             # ACT1-4
             if call.data == 'act1':
                 db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
-                                config.items_list[0], datetime.now())
+                                config.items_list[0], time('%d-%m-%Y %X'))
 
                 # message for admins
                 for admins in config.admin_all:
@@ -267,7 +273,7 @@ async def callback_inline(call):
 
             elif call.data == 'act2':
                 db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
-                                config.items_list[1], datetime.now())
+                                config.items_list[1], time('%d-%m-%Y %X'))
                 for admins in config.admin_all:
                     await bot.send_message(admins, 'Замовлено заміри!')
 
@@ -277,7 +283,7 @@ async def callback_inline(call):
 
             elif call.data == 'act3':
                 db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
-                                config.items_list[2], datetime.now())
+                                config.items_list[2], time('%d-%m-%Y %X'))
                 for admins in config.admin_all:
                     await bot.send_message(admins, 'Замовлено заміри!')
 
@@ -287,7 +293,7 @@ async def callback_inline(call):
 
             elif call.data == 'act4':
                 db.add_callback(call.message.chat.id, call.message.chat.first_name, call.message.chat.last_name,
-                                config.items_list[3], datetime.now())
+                                config.items_list[3], time('%d-%m-%Y %X'))
                 for admins in config.admin_all:
                     await bot.send_message(admins, 'Замовлено заміри!')
 

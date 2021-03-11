@@ -76,15 +76,11 @@ try:
         def return_all(self):
             with self.connection:
                 last0 = self.cursor.execute("""SELECT first_name, item, date FROM sub ORDER BY id DESC LIMIT 4""").fetchall()
-                #last1 = self.cursor.execute("""SELECT phone_number FROM db_phone ORDER BY id DESC
+                # last1 = self.cursor.execute("""SELECT phone_number FROM db_phone ORDER BY id DESC
                 # LIMIT 10""").fetchall()
                 cont = self.cursor.execute("""SELECT sub.id, sub.first_name, sub.item, sub.date, db_phone.phone_number 
                     FROM sub INNER JOIN db_phone ON sub.user_id = db_phone.user_id 
                     ORDER BY sub.id DESC LIMIT 5""").fetchall()
-
-                print("Замовлення №:{}:\nІм'я: {}\nЩо: {}\nДата: {}\nТелефон: {}\n  {}"\
-                    .format(cont[0][0], cont[0][1], cont[0][2], cont[0][3], cont[0][4], last0))
-
                 return "Замовлення №:{}:\nІм'я: {}\nЩо: {}\nДата: {}\nТелефон: {}"\
                     .format(cont[0][0], cont[0][1], cont[0][2], cont[0][3], cont[0][4])
 
